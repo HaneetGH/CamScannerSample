@@ -1,64 +1,46 @@
 package com.technorapper.camscannersample.ui.camera.activity;
 
-import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.Camera;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.view.View;
-import android.widget.ImageView;
 
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
-import com.facebook.login.LoginResult;
-import com.intsig.csopen.sdk.CSOpenAPI;
 import com.intsig.csopen.sdk.CSOpenAPIParam;
-import com.intsig.csopen.sdk.CSOpenApiFactory;
 import com.intsig.csopen.sdk.CSOpenApiHandler;
 import com.intsig.csopen.sdk.ReturnCode;
 import com.intsig.csopen.util.Log;
 import com.technorapper.camscannersample.R;
 import com.technorapper.camscannersample.databinding.MainBinding;
 import com.technorapper.camscannersample.global.BaseActivity;
-
 import com.technorapper.camscannersample.ui.camera.viewmodel.CameraViewModel;
-import com.technorapper.camscannersample.ui.onboading.activity.MainActivity;
-import com.technorapper.camscannersample.ui.onboading.viewmodel.OnBoadingViewModel;
 import com.technorapper.camscannersample.utils.Util;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 
-import static com.technorapper.camscannersample.global.GlobalVariables.APP_KEY;
+import static com.technorapper.camscannersample.utils.Utlities.getImageFilePath;
 
 
-public class CameraActivity extends BaseActivity implements View.OnClickListener {
+public class CameraActivity extends BaseActivity {
 
     private static final String Tag = "CameraActivity";
-    private CSOpenAPI mApi;
+
     private final int REQ_CODE_PICK_IMAGE = 1;
     private final int REQ_CODE_CALL_CAMSCANNER = 2;
 
-
-    private static final String DIR_IMAGE = Environment.getExternalStorageDirectory().getAbsolutePath()
-            + "/CSOpenApiDemo";
 
     // three values for save instance;
     private static final String SCANNED_IMAGE = "scanned_img";
@@ -70,8 +52,8 @@ public class CameraActivity extends BaseActivity implements View.OnClickListener
     private String mOutputImagePath;
     private String mOutputPdfPath;
     private String mOutputOrgPath;
-String _scannedFileUri;
-    private ImageView mImageView;
+    String _scannedFileUri;
+
     private Bitmap mBitmap;
 
 
@@ -84,43 +66,29 @@ String _scannedFileUri;
         super.onCreate(savedInstanceState);
 
 
-        Util.checkDir(DIR_IMAGE);
-        mImageView = findViewById(R.id.image);
-        mApi = CSOpenApiFactory.createCSOpenApi(this.getApplicationContext(), APP_KEY, null);
-
-        findViewById(R.id.pick_and_send).setOnClickListener(this);
-        Log.setLevel(Log.LEVEL_DEBUG);
     }
 
     @Override
     public void onBinding() {
         binding = DataBindingUtil.setContentView(this, R.layout.main);
-
+        binding.setHandler(new ClickHandler());
     }
 
     @Override
     public void onAttachViewModel() {
         viewModel = ViewModelProviders.of(this).get(CameraViewModel.class);
-viewModel.result.observe(this, new Observer<Bitmap>() {
-    @Override
-    public void onChanged(Bitmap bitmap) {
-     binding.image.setImageBitmap(bitmap);
-    }
-});
+        viewModel.result.observe(this, new Observer<Bitmap>() {
+            @Override
+            public void onChanged(Bitmap bitmap) {
+                binding.image.setImageBitmap(bitmap);
+            }
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         binding.image.setImageBitmap(mBitmap);
-    }
-
-    @Override
-    public void onClick(View v) {
-        int id = v.getId();
-        if (id == R.id.pick_and_send) {
-            go2Gallery();
-        }
     }
 
 
@@ -141,12 +109,11 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
     }
 
 
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-        Log.i(Tag, "requestCode:"+requestCode+" resultCode:"+resultCode);
-        if(requestCode == REQ_CODE_CALL_CAMSCANNER){
+        Log.i(Tag, "requestCode:" + requestCode + " resultCode:" + resultCode);
+        if (requestCode == REQ_CODE_CALL_CAMSCANNER) {
             mApi.handleResult(requestCode, resultCode, data, new CSOpenApiHandler() {
 
                 @Override
@@ -181,11 +148,11 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
                             .create().show();
                 }
             });
-        } else if (requestCode == REQ_CODE_PICK_IMAGE && resultCode == RESULT_OK) {	// result of go2Gallery
+        } else if (requestCode == REQ_CODE_PICK_IMAGE && resultCode == RESULT_OK) {    // result of go2Gallery
             if (data != null) {
-                mSourceImagePath = getImageFilePath(data);
+                mSourceImagePath = getImageFilePath(data,this);
                 Uri u = data.getData();
-                Cursor c = getContentResolver().query(u, new String[] { "_data" }, null, null, null);
+                Cursor c = getContentResolver().query(u, new String[]{"_data"}, null, null, null);
                 if (c == null || c.moveToFirst() == false) {
                     return;
                 }
@@ -196,6 +163,7 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
             }
         }
     }
+
     private void go2Gallery() {
         Intent i = new Intent(Intent.ACTION_PICK,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -233,11 +201,11 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
         android.util.Log.d(Tag, "send to CamScanner result: " + res);
     }
 
-    private String handleResponse(int code){
-        switch(code){
+    private String handleResponse(int code) {
+        switch (code) {
             case ReturnCode.OK:
                 return getString(R.string.a_msg_api_success);
-            case  ReturnCode.INVALID_APP:
+            case ReturnCode.INVALID_APP:
                 return getString(R.string.a_msg_invalid_app);
             case ReturnCode.INVALID_SOURCE:
                 return getString(R.string.a_msg_invalid_source);
@@ -265,30 +233,12 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
                 return "Return code = " + code;
         }
     }
-    private Uri getCaptureImageOutputUri() {
-        Uri outputFileUri = null;
-        File getImage = getExternalFilesDir("");
-        if (getImage != null) {
-            outputFileUri = Uri.fromFile(new File(getImage.getPath()));
+
+
+
+    public class ClickHandler {
+        public void pick() {
+            go2Gallery();
         }
-        return outputFileUri;
-    }
-
-    private String getImageFromFilePath(Intent data) {
-        boolean isCamera = data == null || data.getData() == null;
-
-        if (isCamera) return getCaptureImageOutputUri().getPath();
-        else return getPathFromURI(data.getData());
-
-    }
-    public String getImageFilePath(Intent data) {
-        return getImageFromFilePath(data);
-    }
-    private String getPathFromURI(Uri contentUri) {
-        String[] proj = {MediaStore.Audio.Media.DATA};
-        Cursor cursor = getContentResolver().query(contentUri, proj, null, null, null);
-        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
-        cursor.moveToFirst();
-        return cursor.getString(column_index);
     }
 }

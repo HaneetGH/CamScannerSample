@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout>
 
-    <data></data>
+    <data>
+        <variable
+            name="handler"
+            type="com.technorapper.camscannersample.ui.camera.activity.CameraActivity.ClickHandler" />
+    </data>
 
     <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         android:layout_width="fill_parent"
@@ -27,6 +31,7 @@
                 android:layout_above="@+id/pick_and_send"/>
 
             <Button
+                android:onClick="@{()->handler.pick()}"
                 android:id="@+id/pick_and_send"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
