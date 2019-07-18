@@ -1,6 +1,7 @@
 package com.technorapper.camscannersample.ui.camera.activity;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -12,6 +13,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -37,9 +39,12 @@ import com.technorapper.camscannersample.ui.onboading.activity.MainActivity;
 import com.technorapper.camscannersample.ui.onboading.viewmodel.OnBoadingViewModel;
 import com.technorapper.camscannersample.utils.Util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 
 import static com.technorapper.camscannersample.global.GlobalVariables.APP_KEY;
 
@@ -65,7 +70,7 @@ public class CameraActivity extends BaseActivity implements View.OnClickListener
     private String mOutputImagePath;
     private String mOutputPdfPath;
     private String mOutputOrgPath;
-
+String _scannedFileUri;
     private ImageView mImageView;
     private Bitmap mBitmap;
 
@@ -78,25 +83,11 @@ public class CameraActivity extends BaseActivity implements View.OnClickListener
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            // Do the file write
-        } else {
-            // Request permission from the user
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0);
 
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            // Do the file write
-        } else {
-            // Request permission from the user
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 0);
-
-        }
         Util.checkDir(DIR_IMAGE);
         mImageView = findViewById(R.id.image);
-        mApi = CSOpenApiFactory.createCSOpenApi(this, APP_KEY, null);
+        mApi = CSOpenApiFactory.createCSOpenApi(this.getApplicationContext(), APP_KEY, null);
+
         findViewById(R.id.pick_and_send).setOnClickListener(this);
         Log.setLevel(Log.LEVEL_DEBUG);
     }
@@ -153,18 +144,23 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
         Log.i(Tag, "requestCode:"+requestCode+" resultCode:"+resultCode);
         if(requestCode == REQ_CODE_CALL_CAMSCANNER){
             mApi.handleResult(requestCode, resultCode, data, new CSOpenApiHandler() {
 
                 @Override
                 public void onSuccess() {
-                    new AlertDialog.Builder(CameraActivity.this)
-                            .setTitle(R.string.a_title_success)
-                            .setMessage(R.string.a_msg_api_success)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .create().show();
-                    mBitmap = Util.loadBitmap(mOutputImagePath);
+                    Intent databackIntent = new Intent();
+                    databackIntent.putExtra("RESULT", "success");
+                    Bitmap mBitmap = Util.loadBitmap(_scannedFileUri + ".jpg");
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    mBitmap.compress(Bitmap.CompressFormat.JPEG, 30, baos);
+                    byte[] byteArrayImage = baos.toByteArray();
+                    String encodedImage = Base64.encodeToString(byteArrayImage, Base64.DEFAULT);
+                    databackIntent.putExtra("BASE64_RESULT", encodedImage);
+                    setResult(Activity.RESULT_OK, databackIntent);
+                    finish();
                 }
 
                 @Override
@@ -187,6 +183,7 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
             });
         } else if (requestCode == REQ_CODE_PICK_IMAGE && resultCode == RESULT_OK) {	// result of go2Gallery
             if (data != null) {
+                mSourceImagePath = getImageFilePath(data);
                 Uri u = data.getData();
                 Cursor c = getContentResolver().query(u, new String[] { "_data" }, null, null, null);
                 if (c == null || c.moveToFirst() == false) {
@@ -194,6 +191,7 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
                 }
                 mSourceImagePath = c.getString(0);
                 c.close();
+
                 go2CamScanner();
             }
         }
@@ -210,6 +208,8 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
     }
 
     private void go2CamScanner() {
+
+
         mOutputImagePath = DIR_IMAGE + "/scanned.jpg";
         mOutputPdfPath = DIR_IMAGE + "/scanned.pdf";
         mOutputOrgPath = DIR_IMAGE + "/org.jpg";
@@ -222,8 +222,13 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+        _scannedFileUri = DIR_IMAGE + "/" + timeStamp;
         CSOpenAPIParam param = new CSOpenAPIParam(mSourceImagePath,
-                mOutputImagePath, mOutputPdfPath, mOutputOrgPath, 1.0f);
+                _scannedFileUri + ".jpg",
+                _scannedFileUri + ".pdf",
+                _scannedFileUri + "_org.jpg", 1.0f);
+
         boolean res = mApi.scanImage(this, REQ_CODE_CALL_CAMSCANNER, param);
         android.util.Log.d(Tag, "send to CamScanner result: " + res);
     }
@@ -259,5 +264,31 @@ viewModel.result.observe(this, new Observer<Bitmap>() {
             default:
                 return "Return code = " + code;
         }
+    }
+    private Uri getCaptureImageOutputUri() {
+        Uri outputFileUri = null;
+        File getImage = getExternalFilesDir("");
+        if (getImage != null) {
+            outputFileUri = Uri.fromFile(new File(getImage.getPath()));
+        }
+        return outputFileUri;
+    }
+
+    private String getImageFromFilePath(Intent data) {
+        boolean isCamera = data == null || data.getData() == null;
+
+        if (isCamera) return getCaptureImageOutputUri().getPath();
+        else return getPathFromURI(data.getData());
+
+    }
+    public String getImageFilePath(Intent data) {
+        return getImageFromFilePath(data);
+    }
+    private String getPathFromURI(Uri contentUri) {
+        String[] proj = {MediaStore.Audio.Media.DATA};
+        Cursor cursor = getContentResolver().query(contentUri, proj, null, null, null);
+        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
+        cursor.moveToFirst();
+        return cursor.getString(column_index);
     }
 }
