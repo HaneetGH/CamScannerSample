@@ -1,6 +1,11 @@
 package com.technorapper.camscannersample.ui.onboading.activity;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.util.Base64;
+import android.widget.Toast;
 
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.Observer;
@@ -11,11 +16,15 @@ import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
+import com.intsig.csopen.util.Log;
 import com.technorapper.camscannersample.R;
 import com.technorapper.camscannersample.databinding.ActivityMainBinding;
 import com.technorapper.camscannersample.global.BaseActivity;
 import com.technorapper.camscannersample.ui.camera.activity.CameraActivity;
 import com.technorapper.camscannersample.ui.onboading.viewmodel.OnBoadingViewModel;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class MainActivity extends BaseActivity {
     ActivityMainBinding binding;
@@ -58,19 +67,13 @@ public class MainActivity extends BaseActivity {
 
                     @Override
                     public void onCancel() {
-                        // App code
-                       // data.setValue(null);
-                     //   baseLoginResult = loginResult;
-                        Intent intent = new Intent(MainActivity.this, CameraActivity.class);
-                        startActivity(intent);
+                        Toast.makeText(getApplicationContext(),"User Cancel",Toast.LENGTH_LONG).show();
                     }
 
                     @Override
                     public void onError(FacebookException exception) {
-                        // App code
-                       // data.setValue(null);
-                        Intent intent = new Intent(MainActivity.this, CameraActivity.class);
-                        startActivity(intent);
+                        Toast.makeText(getApplicationContext(),exception.toString(),Toast.LENGTH_LONG).show();
+
                     }
 
                 });
@@ -84,7 +87,25 @@ public class MainActivity extends BaseActivity {
     }
     public class ClickHandler {
         public void login() {
+            printKeyHash();
             flogin();
+
+        }
+    }
+
+    private void printKeyHash() {
+        // Add code to print out the key hash
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo("com.technorapper.camscannersample", PackageManager.GET_SIGNATURES);
+            for (Signature signature : info.signatures) {
+                MessageDigest md = MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                Log.d("KeyHash:", Base64.encodeToString(md.digest(), Base64.DEFAULT));
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.e("KeyHash:", e.toString());
+        } catch (NoSuchAlgorithmException e) {
+            Log.e("KeyHash:", e.toString());
         }
     }
 }
