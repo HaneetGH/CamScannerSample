@@ -2,7 +2,6 @@
     <string name="app_name">CamScannerSample</string>
     <string name="facebook_app_id">634075710445595</string>
     <string name="fb_login_protocol_scheme">fb634075710445595</string>
-
     <string name="a_msg_no_pdf_activity">No activity for opening PDF file</string>
     <string name="a_title_success">Success</string>
     <string name="a_title_reject">Fail</string>
