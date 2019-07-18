@@ -29,7 +29,7 @@ import java.security.NoSuchAlgorithmException;
 public class MainActivity extends BaseActivity {
     ActivityMainBinding binding;
     OnBoadingViewModel viewModel;
-
+    CallbackManager callbackManager;
     @Override
     public void onBinding() {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
@@ -51,7 +51,7 @@ public class MainActivity extends BaseActivity {
         });
 
     }
-    CallbackManager callbackManager;
+
     public void flogin() {
         callbackManager = CallbackManager.Factory.create();
         LoginManager.getInstance().registerCallback(callbackManager,
